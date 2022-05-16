@@ -1,0 +1,21 @@
+{
+  "name": "contracts",
+  "version": "1.0.0",
+  "description": "Contracts for BlockCOOP",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Shashank Mestry",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.6",
+    "ethers": "^5.6.6",
+    "hardhat": "^2.9.5"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.6.0",
+    "dotenv": "^16.0.1",
+    "hardhat-contract-sizer": "^2.5.1"
+  }
+}
