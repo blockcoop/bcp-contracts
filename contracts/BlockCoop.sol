@@ -4,9 +4,11 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "./ICoopFactory.sol";
 // import "./CoopToken.sol";
 
 contract BlockCoop  is ERC20 {
+    address factoryAddress;
     address public coopInitiator;
     uint32 public votingPeriod;
     uint32 public gracePeriod;
@@ -21,7 +23,8 @@ contract BlockCoop  is ERC20 {
 
     uint initialMint = 100 ether;
 
-    mapping (address => uint) members; // memberAddress => shares
+    mapping (address => uint) shares; // memberAddress => shares
+    address[] members;
     mapping (uint => Task) tasks;
 
     enum Vote {
@@ -52,6 +55,7 @@ contract BlockCoop  is ERC20 {
     }
 
     constructor(string memory _name, string memory _symbol, address _coopInitiator, uint32 _votingPeriod, uint32 _gracePeriod, uint32 _quorum, uint32 _supermajority, uint _membershipFee) ERC20(_name, _symbol) {
+        factoryAddress = msg.sender;
         coopInitiator = _coopInitiator;
         votingPeriod = _votingPeriod;
         gracePeriod = _gracePeriod;
@@ -59,19 +63,22 @@ contract BlockCoop  is ERC20 {
         supermajority = _supermajority;
         membershipFee = _membershipFee;
 
-        members[_coopInitiator] = initialMint;
+        shares[_coopInitiator] = initialMint;
+        members.push(_coopInitiator);
         _mint(_coopInitiator, initialMint);
     }
 
     modifier onlyMember {
-        require(members[msg.sender] > 0, "not a member");
+        require(shares[msg.sender] > 0, "not a member");
         _;
     }
 
     function joinCoop() public payable {
-        require(members[msg.sender] == 0, "already a member");
+        require(shares[msg.sender] == 0, "already a member");
         require(msg.value == membershipFee, "invalid membership fee");
-        members[msg.sender] = initialMint;
+        shares[msg.sender] = initialMint;
+        members.push(msg.sender);
+        ICoopFactory(factoryAddress).addMember(msg.sender);
         _mint(msg.sender, initialMint);
     }
 
@@ -115,6 +122,10 @@ contract BlockCoop  is ERC20 {
             task.votes[msg.sender] = Vote.No;
             task.noVotes = task.noVotes + 1;
         }
+    }
+
+    function getMembers() public view returns (address[] memory) {
+        return members;
     }
 
 }
