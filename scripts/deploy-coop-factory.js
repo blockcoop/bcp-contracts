@@ -10,4 +10,4 @@ async function main() {
         process.exit(1);
     });
 
-// CoopFactoryAddress: 0x1a07E67708BFF488b97C05D264656354db39A321
+// CoopFactoryAddress: 0x46fc6447cF708962BFcd1D0446289F2E1D297EB3
