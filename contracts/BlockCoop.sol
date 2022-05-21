@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./ICoopFactory.sol";
-// import "./CoopToken.sol";
+import "./CoopToken.sol";
 
 contract BlockCoop  is ERC20 {
     address factoryAddress;
@@ -23,7 +23,8 @@ contract BlockCoop  is ERC20 {
 
     uint initialMint = 100 ether;
 
-    mapping (address => uint) shares; // memberAddress => shares
+    // @todo: rename shares to memShares
+    mapping (address => uint) shares; // memberAddress => shares 
     address[] members;
     mapping (uint => Task) tasks;
 
@@ -31,8 +32,9 @@ contract BlockCoop  is ERC20 {
     event TaskCreated(uint indexed taskId, address indexed creator);
     event Participated(uint indexed taskId, address participant);
     event Voted(uint indexed taskId, address member);
-    event TaskStatusUpdated(uint indexed taskId, TaskStatus status);
     event StatusUpdated(uint8 status);
+    event TaskVoteProcessed(uint indexed taskId, address creator, TaskStatus status);
+    event TaskCompletionProcessed(uint indexed taskId, address creator, TaskStatus status);
 
     enum Vote {
         Null,
@@ -43,6 +45,7 @@ contract BlockCoop  is ERC20 {
     enum TaskStatus {
         Proposed,
         Voted,
+        NotAccepted, // in voting
         Cancelled,
         Started,
         Failed,
@@ -53,7 +56,7 @@ contract BlockCoop  is ERC20 {
         address creator;
         string details;
         TaskStatus status;
-        uint32 VotingDeadline;
+        uint32 votingDeadline;
         uint32 taskDeadline;
         uint yesVotes;
         uint noVotes;
@@ -88,6 +91,7 @@ contract BlockCoop  is ERC20 {
         members.push(msg.sender);
         ICoopFactory(factoryAddress).addMember(msg.sender);
         _mint(msg.sender, initialMint);
+        emit CoopJoined(msg.sender);
     }
 
     function createTask(string memory _details, uint32 _votingDeadline, uint32 _taskDeadline) public onlyMember {
@@ -98,8 +102,9 @@ contract BlockCoop  is ERC20 {
         task.creator = msg.sender;
         task.details = _details;
         task.status = TaskStatus.Proposed;
-        task.VotingDeadline = _votingDeadline;
+        task.votingDeadline = _votingDeadline;
         task.taskDeadline = _taskDeadline;
+        emit TaskCreated(_taskCount.current(), msg.sender);
     }
 
     function getTaskCount() public view returns (uint) {
@@ -117,13 +122,14 @@ contract BlockCoop  is ERC20 {
         require(task.isParticipants[msg.sender] == false, "already participated");
         task.isParticipants[msg.sender] = true;
         task.participants.push(msg.sender);
+        emit Participated(_taskId, msg.sender);
     }
 
     function vote(uint _taskId, bool _vote) public onlyMember taskExists(_taskId) {
         Task storage task = tasks[_taskId];
         require(task.status == TaskStatus.Proposed);
         require(task.votes[msg.sender] == Vote.Null, "already voted");
-        require(task.VotingDeadline >= block.timestamp, "voting closed");
+        require(task.votingDeadline >= block.timestamp, "voting closed");
         if(_vote) {
             task.votes[msg.sender] = Vote.Yes;
             task.yesVotes = task.yesVotes + 1;
@@ -131,6 +137,7 @@ contract BlockCoop  is ERC20 {
             task.votes[msg.sender] = Vote.No;
             task.noVotes = task.noVotes + 1;
         }
+        emit Voted(_taskId, msg.sender);
     }
 
     function getMembers() public view returns (address[] memory) {
@@ -142,9 +149,40 @@ contract BlockCoop  is ERC20 {
         creator = task.creator;
         details = task.details;
         taskStatus = task.status;
-        votingDeadline = task.VotingDeadline;
+        votingDeadline = task.votingDeadline;
         taskDeadline = task.taskDeadline;
         participants = task.participants;
+    }
+
+    function processTaskVoting(uint _taskId) public {
+        Task storage task = tasks[_taskId];
+        require(task.votingDeadline < block.timestamp, "voting not yet closed");
+        require(msg.sender == task.creator, "not allowed");
+
+        uint minVotes = members.length * quorum / 100;
+        if((task.yesVotes + task.noVotes) > minVotes) {
+            uint minYesVotes = (task.yesVotes + task.noVotes) * supermajority / 100;
+            if(task.yesVotes >= minYesVotes) {
+                task.status = TaskStatus.Started;
+            } else {
+                task.status = TaskStatus.Cancelled;
+            }
+        } else {
+            task.status = TaskStatus.NotAccepted;
+        }
+        emit TaskVoteProcessed(_taskId, msg.sender, task.status);
+    }
+
+    function processTaskCompletion(uint _taskId, bool isCompleted) public {
+        Task storage task = tasks[_taskId];
+        require(task.taskDeadline < block.timestamp, "task not yet closed");
+        require(msg.sender == task.creator, "not allowed");
+        if(isCompleted) {
+            task.status = TaskStatus.Completed;
+        } else {
+            task.status = TaskStatus.Failed;
+        }
+        emit TaskCompletionProcessed(_taskId, msg.sender, task.status);
     }
 
 }
