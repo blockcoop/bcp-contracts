@@ -40,4 +40,8 @@ contract Factory {
         require(validCoops[msg.sender], "not allowed");
         memberCoops[memberAddress].push(msg.sender);
     }
+
+    function isValidCoop(address coopAddress) public view returns (bool) {
+        return validCoops[coopAddress];
+    }
 }

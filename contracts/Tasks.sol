@@ -3,14 +3,18 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./ICoop.sol";
+import "./IFactory.sol";
 
 contract Tasks {
+    address factoryAddress;
 
     using Counters for Counters.Counter;
     Counters.Counter private _taskCount;
 
-    address manager;
     mapping (uint => Task) tasks;
+    mapping (address => uint[]) coopTasks;
+    mapping (address => uint[]) createdTasks;
+    mapping (address => uint[]) participatedTasks;
 
     event TaskCreated(uint indexed taskId, address indexed creator);
     event Participated(uint indexed taskId, address participant);
@@ -26,6 +30,7 @@ contract Tasks {
     }
 
     enum TaskStatus {
+        Invalid, // default
         Proposed,
         Voted,
         NotAccepted, // in voting
@@ -53,7 +58,15 @@ contract Tasks {
         mapping (address => Vote) completionVotes;
     }
 
+    constructor(address _factoryAddress) {
+        factoryAddress = _factoryAddress;
+    }
+
     function createTask(address _creator, address _blockcoop, uint8 _groupId, string memory _details, uint32 _votingDeadline, uint32 _taskDeadline) public {
+        bool isValidCoop = IFactory(factoryAddress).isValidCoop(_blockcoop);
+        require(isValidCoop == true, "invalid blockcoop");
+        bool isGroupMember = ICoop(_blockcoop).isGroupMember(msg.sender, 1);
+        require(isGroupMember == true, "not member");
         require(_votingDeadline > block.timestamp, "invalid voting deadline");
         require(_taskDeadline > _votingDeadline, "invalid task deadline");
         _taskCount.increment();
@@ -65,6 +78,8 @@ contract Tasks {
         task.status = TaskStatus.Proposed;
         task.votingDeadline = _votingDeadline;
         task.taskDeadline = _taskDeadline;
+        coopTasks[_blockcoop].push(_taskCount.current());
+        createdTasks[msg.sender].push(_taskCount.current());
         emit TaskCreated(_taskCount.current(), _creator);
     }
 
@@ -77,6 +92,7 @@ contract Tasks {
         require(isGroupMember == true, "not allowed");
         task.isParticipant[msg.sender] = true;
         task.participants.push(msg.sender);
+        participatedTasks[msg.sender].push(_taskId);
         emit Participated(_taskId, msg.sender);
     }
 
@@ -101,6 +117,7 @@ contract Tasks {
 
     function processTaskVoting(uint _taskId) public {
         Task storage task = tasks[_taskId];
+        require(task.status == TaskStatus.Proposed, "invalid task status");
         require(task.votingDeadline < block.timestamp, "voting not yet closed");
         require(msg.sender == task.creator, "not allowed");
 
@@ -143,6 +160,7 @@ contract Tasks {
 
     function processTaskCompletion(uint _taskId) public {
         Task storage task = tasks[_taskId];
+        require(task.status == TaskStatus.Started, "invalid task status");
         require((task.taskDeadline + 604800) < block.timestamp, "voting not yet closed"); // taskdeadline + 7days
         require(msg.sender == task.creator, "not allowed");
 
@@ -152,5 +170,17 @@ contract Tasks {
             task.status = TaskStatus.Failed;
         }
         emit TaskCompletionProcessed(_taskId, msg.sender, task.status);
+    }
+
+    function getCoopTasks(address _coopAddress) public view returns (uint[] memory) {
+        return coopTasks[_coopAddress];
+    }
+
+    function getCreatedTasks(address _member) public view returns (uint[] memory) {
+        return createdTasks[_member];
+    }
+
+    function getParticipatedTasks(address _member) public view returns (uint[] memory) {
+        return participatedTasks[_member];
     }
 }
