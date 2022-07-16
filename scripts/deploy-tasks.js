@@ -1,6 +1,6 @@
 async function main() {
     const Tasks = await ethers.getContractFactory("Tasks");
-    const tasks = await Tasks.deploy("0xA88ed925dfd96aeB4B0f580fec02Bb2eB21aA9FF");   
+    const tasks = await Tasks.deploy("0x662ab6Fc87cc28bD631Ac8BDad0E6eFe0208b4f9");   
     console.log("Tasks Contract deployed to address:", tasks.address);
  }
  main()
@@ -10,4 +10,4 @@ async function main() {
         process.exit(1);
     });
 
-// CoopFactoryAddress: 0x351bFFb40544C541A84d3f578059a22e6575d3Bd
+// CoopFactoryAddress: 0xeC1B3dC4347B6aA4068332AAa53af70Cc8eAAc9F

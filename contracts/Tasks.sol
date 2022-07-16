@@ -62,7 +62,7 @@ contract Tasks {
         factoryAddress = _factoryAddress;
     }
 
-    function createTask(address _creator, address _blockcoop, uint8 _groupId, string memory _details, uint32 _votingDeadline, uint32 _taskDeadline) public {
+    function createTask(address _blockcoop, uint8 _groupId, string memory _details, uint32 _votingDeadline, uint32 _taskDeadline) public {
         bool isValidCoop = IFactory(factoryAddress).isValidCoop(_blockcoop);
         require(isValidCoop == true, "invalid blockcoop");
         bool isGroupMember = ICoop(_blockcoop).isGroupMember(msg.sender, 1);
@@ -71,7 +71,7 @@ contract Tasks {
         require(_taskDeadline > _votingDeadline, "invalid task deadline");
         _taskCount.increment();
         Task storage task = tasks[_taskCount.current()];
-        task.creator = _creator;
+        task.creator = msg.sender;
         task.blockcoop = _blockcoop;
         task.groupId = _groupId;
         task.details = _details;
@@ -80,7 +80,7 @@ contract Tasks {
         task.taskDeadline = _taskDeadline;
         coopTasks[_blockcoop].push(_taskCount.current());
         createdTasks[msg.sender].push(_taskCount.current());
-        emit TaskCreated(_taskCount.current(), _creator);
+        emit TaskCreated(_taskCount.current(), msg.sender);
     }
 
     function participate(uint _taskId) public {
@@ -172,6 +172,18 @@ contract Tasks {
         emit TaskCompletionProcessed(_taskId, msg.sender, task.status);
     }
 
+    function getTask(uint taskId) public view returns (address creator, address blockcoop, uint groupId, string memory details, TaskStatus taskStatus, uint32 votingDeadline, uint32 taskDeadline, address[] memory participants) {
+        Task storage task = tasks[taskId];
+        creator = task.creator;
+        blockcoop = task.blockcoop;
+        groupId = task.groupId;
+        details = task.details;
+        taskStatus = task.status;
+        votingDeadline = task.votingDeadline;
+        taskDeadline = task.taskDeadline;
+        participants = task.participants;
+    }
+
     function getCoopTasks(address _coopAddress) public view returns (uint[] memory) {
         return coopTasks[_coopAddress];
     }
@@ -182,5 +194,15 @@ contract Tasks {
 
     function getParticipatedTasks(address _member) public view returns (uint[] memory) {
         return participatedTasks[_member];
+    }
+
+    function isVoted(uint taskId) public view returns (bool) {
+        Task storage task = tasks[taskId];
+        return task.votes[msg.sender] != Vote.Null;
+    }
+
+    function isTaskCompletionVoted(uint taskId) public view returns (bool) {
+        Task storage task = tasks[taskId];
+        return task.completionVotes[msg.sender] != Vote.Null;
     }
 }

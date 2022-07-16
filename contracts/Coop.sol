@@ -110,4 +110,12 @@ contract Coop is ERC20 {
     function getModeratorCount(uint groupId) public view returns (uint) {
         return groupModeratorCount[groupId];
     }
+
+    function getGroupCount() public view returns (uint) {
+        return _groupCount.current();
+    }
+
+    function getGroupNameById(uint groupId) public view returns (string memory) {
+        return groups[groupId];
+    }
 }
