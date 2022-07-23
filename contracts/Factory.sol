@@ -2,8 +2,10 @@
 pragma solidity ^0.8.0;
 
 import "./Coop.sol";
+import "./interfaces/ITokenURI.sol";
 
 contract Factory {
+    address TokenURIAddress;
     Coop private coop;
     mapping(string => bool) existingSymbols;
     address[] public coops;
@@ -12,6 +14,10 @@ contract Factory {
     mapping (address => bool) validCoops;
 
     event CoopCreated(address indexed initiator, address coopAddress);
+
+    constructor(address _tokenURIAddress) {
+        TokenURIAddress = _tokenURIAddress;
+    }
 
     function getCoopCount() public view returns (uint) {
         return coops.length;
@@ -43,5 +49,10 @@ contract Factory {
 
     function isValidCoop(address coopAddress) public view returns (bool) {
         return validCoops[coopAddress];
+    }
+
+    function getTokenURI(string memory name, string memory memberType) public view returns (string memory) {
+        string memory tokenURI = ITokenURI(TokenURIAddress).create(name, memberType);
+        return tokenURI;
     }
 }

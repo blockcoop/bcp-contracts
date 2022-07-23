@@ -2,11 +2,13 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "./ICoop.sol";
-import "./IFactory.sol";
+import "./interfaces/ICoop.sol";
+import "./interfaces/IFactory.sol";
+import "./interfaces/IGroups.sol";
 
 contract Tasks {
     address factoryAddress;
+    address groupsAddress;
 
     using Counters for Counters.Counter;
     Counters.Counter private _taskCount;
@@ -58,15 +60,15 @@ contract Tasks {
         mapping (address => Vote) completionVotes;
     }
 
-    constructor(address _factoryAddress) {
+    constructor(address _factoryAddress, address _groupsAddress) {
         factoryAddress = _factoryAddress;
+        groupsAddress = _groupsAddress;
     }
 
     function createTask(address _blockcoop, uint8 _groupId, string memory _details, uint32 _votingDeadline, uint32 _taskDeadline) public {
-        bool isValidCoop = IFactory(factoryAddress).isValidCoop(_blockcoop);
-        require(isValidCoop == true, "invalid blockcoop");
-        bool isGroupMember = ICoop(_blockcoop).isGroupMember(msg.sender, 1);
-        require(isGroupMember == true, "not member");
+        require(IFactory(factoryAddress).isValidCoop(_blockcoop), "invalid blockcoop");
+        require(ICoop(_blockcoop).balanceOf(msg.sender) > 0, "not member");
+        require(IGroups(groupsAddress).existsCoopGroup(_blockcoop, _groupId), "invalid blockcoop group");
         require(_votingDeadline > block.timestamp, "invalid voting deadline");
         require(_taskDeadline > _votingDeadline, "invalid task deadline");
         _taskCount.increment();
@@ -88,8 +90,7 @@ contract Tasks {
         require(task.status == TaskStatus.Proposed, "invalid task status");
         require(task.votingDeadline > block.timestamp, "not allowed");
         require(task.isParticipant[msg.sender] == false, "already participated");
-        bool isGroupMember = ICoop(task.blockcoop).isGroupMember(msg.sender, task.groupId);
-        require(isGroupMember == true, "not allowed");
+        require(IGroups(groupsAddress).isGroupMember(msg.sender, task.groupId), "not allowed");
         task.isParticipant[msg.sender] = true;
         task.participants.push(msg.sender);
         participatedTasks[msg.sender].push(_taskId);
@@ -102,8 +103,7 @@ contract Tasks {
         require(task.votes[msg.sender] == Vote.Null, "already voted");
         require(task.votingDeadline >= block.timestamp, "voting closed");
 
-        bool isGroupMember = ICoop(task.blockcoop).isGroupMember(msg.sender, task.groupId);
-        require(isGroupMember == true, "not allowed");
+        require(IGroups(groupsAddress).isGroupMember(msg.sender, task.groupId), "not allowed");
 
         if(_vote) {
             task.votes[msg.sender] = Vote.Yes;
@@ -121,7 +121,7 @@ contract Tasks {
         require(task.votingDeadline < block.timestamp, "voting not yet closed");
         require(msg.sender == task.creator, "not allowed");
 
-        uint members = ICoop(task.blockcoop).getMemberCount(task.groupId);
+        uint members = IGroups(groupsAddress).getGroupMemberCount(task.groupId);
         uint quorum = ICoop(task.blockcoop).quorum();
         uint supermajority = ICoop(task.blockcoop).supermajority();
         uint minVotes = members * quorum / 100;
@@ -144,9 +144,7 @@ contract Tasks {
         require(task.status == TaskStatus.Started, "invalid task status");
         require(task.completionVotes[msg.sender] == Vote.Null, "already voted");
         require(task.taskDeadline < block.timestamp, "task deadline not yet closed");
-
-        bool isModerator = ICoop(task.blockcoop).isModerator(msg.sender, task.groupId);
-        require(isModerator == true, "not allowed");
+        require(IGroups(groupsAddress).isGroupModerator(msg.sender, task.groupId), "not allowed");
 
         if(_vote) {
             task.completionVotes[msg.sender] = Vote.Yes;
