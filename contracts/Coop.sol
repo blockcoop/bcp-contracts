@@ -18,41 +18,57 @@ contract Coop is ERC721URIStorage {
     uint8 public status; // 1:PENDING, 2:ACTIVE, 3:CLOSED
     uint32 public created;
     uint public membershipFee;
+    string public country;
 
     event CoopJoined(address indexed member);
 
-    constructor(string memory _name, string memory _symbol, address _coopInitiator, uint32 _votingPeriod, uint32 _quorum, uint32 _supermajority, uint _membershipFee) ERC721 (_name, _symbol) {
+    constructor(string memory _name, string memory _symbol, address _coopInitiator, uint32 _votingPeriod, uint32 _quorum, uint32 _supermajority, uint _membershipFee, string memory _country) ERC721 (_name, _symbol) {
         factoryAddress = msg.sender;
         coopInitiator = _coopInitiator;
         votingPeriod = _votingPeriod;
         quorum = _quorum;
         supermajority = _supermajority;
         membershipFee = _membershipFee;
+        country = _country;
         status = 2;
         
-        MintNFT("Creator");
+        MintNFT(_coopInitiator, "Creator");
     }
 
     function setTransferLocked(bool _locked) private {
         transferLocked = _locked;
     }
 
-    function MintNFT(string memory memberType) private {
+    function MintNFT(address member, string memory memberType) private {
         uint256 newItemId = _tokenIds.current();
-        string memory finalTokenUri = IFactory(factoryAddress).getTokenURI(name(), memberType);
+        string memory _name = name();
+        string memory finalTokenUri = IFactory(factoryAddress).getTokenURI(_name, memberType);
+        // string memory finalTokenUri = "0xa8da7eB9ED0629dE63cA5D7150a74e1AFbEfAac0";
 
         setTransferLocked(false);
-        _safeMint(msg.sender, newItemId);
+        _safeMint(member, newItemId);
         setTransferLocked(true);
         _setTokenURI(newItemId, finalTokenUri);
         _tokenIds.increment();
     }
 
+    // function _beforeTokenTransfer(
+    //     address from,
+    //     address to,
+    //     uint256 tokenId
+    // ) internal override {
+    //     require(!transferLocked, "not allowed");
+    // }
+
     function joinCoop() public payable {
         require(balanceOf(msg.sender) == 0, "already a member");
         require(msg.value == membershipFee, "invalid membership fee");
-        MintNFT("Member");
+        MintNFT(msg.sender, "Member");
         IFactory(factoryAddress).addMember(msg.sender);
         emit CoopJoined(msg.sender);
+    }
+
+    function getCoopSize() public view returns (uint) {
+        return _tokenIds.current();
     }
 }

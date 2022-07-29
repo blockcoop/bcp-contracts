@@ -62,6 +62,7 @@ contract Groups {
     function assignModerator(address blockcoop, uint groupId, address moderator) public {
         require(ICoop(blockcoop).coopInitiator() == msg.sender, "not allowed");
         require(isGroupMember(moderator, groupId), "not a group member");
+        require(!isGroupModerator(moderator, groupId), "already a group moderator");
 
         Group storage group = groups[groupId];
         group.moderators.push(moderator);
