@@ -1,41 +1,31 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "./interfaces/ICoop.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IFactory.sol";
+import "./interfaces/ICoop.sol";
 import "./interfaces/IGroups.sol";
+import "./interfaces/IVoting.sol";
 
 contract Tasks {
     address factoryAddress;
     address groupsAddress;
+    address votingAddress;
 
     using Counters for Counters.Counter;
     Counters.Counter private _taskCount;
 
-    mapping (uint => Task) tasks;
-    mapping (address => uint[]) coopTasks;
-    mapping (address => uint[]) createdTasks;
-    mapping (address => uint[]) participatedTasks;
+    address constant CURRENCY = 0x6e557F271447FD2aA420cbafCdCD66eCDD5A71A8;
 
-    event TaskCreated(uint indexed taskId, address indexed creator);
-    event Participated(uint indexed taskId, address participant);
-    event Voted(uint indexed taskId, address member);
-    event VotedTaskCompletion(uint indexed taskId, address member);
-    event TaskVoteProcessed(uint indexed taskId, address creator, TaskStatus status);
-    event TaskCompletionProcessed(uint indexed taskId, address creator, TaskStatus status);
+    mapping(uint => Task) tasks;
 
-    enum Vote {
-        Null,
-        Yes,
-        No
-    }
+    event TaskCreated(uint taskId, address indexed account, address indexed blockcoop, uint groupId);
+    event Participated(uint indexed taskId, address indexed account);
 
     enum TaskStatus {
         Invalid, // default
         Proposed,
-        Voted,
-        NotAccepted, // in voting
         Cancelled,
         Started,
         Failed,
@@ -47,160 +37,131 @@ contract Tasks {
         address blockcoop;
         uint8 groupId;
         string details;
-        TaskStatus status;
-        uint32 votingDeadline;
-        uint32 taskDeadline;
-        uint yesVotes;
-        uint noVotes;
-        mapping (address => Vote) votes;
-        mapping (address => bool) isParticipant;
+        uint participationDeadline;
+        uint taskDuration;
+        uint taskDeadline;
         address[] participants;
-        uint yesVotesCompletion;
-        uint noVotesCompletion;
-        mapping (address => Vote) completionVotes;
+        mapping(address => uint) applicationProposal;
+        address[] selectedParticipants;
+        uint reward;
+        uint completionProposal;
+        mapping(address => bool) rewardClaimed;
+        TaskStatus status;
     }
 
-    constructor(address _factoryAddress, address _groupsAddress) {
-        factoryAddress = _factoryAddress;
-        groupsAddress = _groupsAddress;
+    constructor(address factory, address groups, address voting) {
+        factoryAddress = factory;
+        groupsAddress = groups;
+        votingAddress = voting;
     }
 
-    function createTask(address _blockcoop, uint8 _groupId, string memory _details, uint32 _votingDeadline, uint32 _taskDeadline) public {
-        require(IFactory(factoryAddress).isValidCoop(_blockcoop), "invalid blockcoop");
-        require(ICoop(_blockcoop).balanceOf(msg.sender) > 0, "not member");
-        require(IGroups(groupsAddress).existsCoopGroup(_blockcoop, _groupId), "invalid blockcoop group");
-        require(_votingDeadline > block.timestamp, "invalid voting deadline");
-        require(_taskDeadline > _votingDeadline, "invalid task deadline");
+    function createTask(address blockcoop, uint8 groupId, string memory details, uint32 participationDeadline, uint32 taskDuration, uint reward) public returns (uint taskId) {
+        require(IFactory(factoryAddress).isValidCoop(blockcoop), "invalid blockcoop");
+        address account = ICoop(blockcoop).getAccount(msg.sender);
+        require(IGroups(groupsAddress).existsCoopGroup(blockcoop, groupId), "invalid blockcoop group");
+        require(participationDeadline > block.timestamp, "invalid participation deadline");
+        require(taskDuration > 0, "invalid task duration");
+
         _taskCount.increment();
-        Task storage task = tasks[_taskCount.current()];
-        task.creator = msg.sender;
-        task.blockcoop = _blockcoop;
-        task.groupId = _groupId;
-        task.details = _details;
+        taskId = _taskCount.current();
+
+        Task storage task = tasks[taskId];
+        task.creator = account;
+        task.blockcoop = blockcoop;
+        task.groupId = groupId;
+        task.details = details;
+        task.participationDeadline = participationDeadline;
+        task.taskDuration = taskDuration;
+        task.reward = reward;
         task.status = TaskStatus.Proposed;
-        task.votingDeadline = _votingDeadline;
-        task.taskDeadline = _taskDeadline;
-        coopTasks[_blockcoop].push(_taskCount.current());
-        createdTasks[msg.sender].push(_taskCount.current());
-        emit TaskCreated(_taskCount.current(), msg.sender);
+
+        emit TaskCreated(taskId, account, blockcoop, groupId);
     }
 
-    function participate(uint _taskId) public {
-        Task storage task = tasks[_taskId];
+    function participate(uint taskId, string memory application) public {
+        Task storage task = tasks[taskId];
         require(task.status == TaskStatus.Proposed, "invalid task status");
-        require(task.votingDeadline > block.timestamp, "not allowed");
-        require(task.isParticipant[msg.sender] == false, "already participated");
-        require(IGroups(groupsAddress).isGroupMember(msg.sender, task.groupId), "not allowed");
-        task.isParticipant[msg.sender] = true;
-        task.participants.push(msg.sender);
-        participatedTasks[msg.sender].push(_taskId);
-        emit Participated(_taskId, msg.sender);
+        require(task.participationDeadline > block.timestamp, "participation deadline expired");
+        address account = ICoop(task.blockcoop).getAccount(msg.sender);
+        require(task.applicationProposal[account] == 0, "already applied");
+        require(IGroups(groupsAddress).isGroupMember(account, task.groupId), "not allowed");
+
+        uint proposalId = IVoting(votingAddress).createProposal(msg.sender, task.blockcoop, task.groupId, application, block.timestamp, task.participationDeadline);
+
+        task.participants.push(account);
+        task.applicationProposal[account] = proposalId;
+
+        emit Participated(taskId, account);
     }
 
-    function vote(uint _taskId, bool _vote) public {
-        Task storage task = tasks[_taskId];
+    function processTask(uint taskId) public {
+        Task storage task = tasks[taskId];
         require(task.status == TaskStatus.Proposed, "invalid task status");
-        require(task.votes[msg.sender] == Vote.Null, "already voted");
-        require(task.votingDeadline >= block.timestamp, "voting closed");
-
-        require(IGroups(groupsAddress).isGroupMember(msg.sender, task.groupId), "not allowed");
-
-        if(_vote) {
-            task.votes[msg.sender] = Vote.Yes;
-            task.yesVotes = task.yesVotes + 1;
-        } else {
-            task.votes[msg.sender] = Vote.No;
-            task.noVotes = task.noVotes + 1;
-        }
-        emit Voted(_taskId, msg.sender);
-    }
-
-    function processTaskVoting(uint _taskId) public {
-        Task storage task = tasks[_taskId];
-        require(task.status == TaskStatus.Proposed, "invalid task status");
-        require(task.votingDeadline < block.timestamp, "voting not yet closed");
-        require(msg.sender == task.creator, "not allowed");
-
-        uint members = IGroups(groupsAddress).getGroupMemberCount(task.groupId);
-        uint quorum = ICoop(task.blockcoop).quorum();
-        uint supermajority = ICoop(task.blockcoop).supermajority();
-        uint minVotes = members * quorum / 100;
-        
-        if((task.yesVotes + task.noVotes) > minVotes) {
-            uint minYesVotes = (task.yesVotes + task.noVotes) * supermajority / 100;
-            if(task.yesVotes >= minYesVotes) {
+        require(task.participationDeadline < block.timestamp, "participation deadline not over");
+        uint proposalStatus;
+        address account = ICoop(task.blockcoop).getAccount(msg.sender);
+        require(task.creator == account, "not allowed");
+        if(task.participants.length > 0) {
+            for(uint i = 0; i < task.participants.length; i++) {
+                proposalStatus = IVoting(votingAddress).getProposalStatus(task.applicationProposal[task.participants[i]]);
+                if(proposalStatus == 3) {
+                    task.selectedParticipants.push(task.participants[i]);
+                }
+            }
+            if(task.selectedParticipants.length > 0) {
                 task.status = TaskStatus.Started;
+                task.taskDeadline = block.timestamp + task.taskDuration;
             } else {
                 task.status = TaskStatus.Cancelled;
             }
         } else {
-            task.status = TaskStatus.NotAccepted;
+            task.status = TaskStatus.Cancelled;
         }
-        emit TaskVoteProcessed(_taskId, msg.sender, task.status);
     }
 
-    function voteTaskCompletion(uint _taskId, bool _vote) public {
-        Task storage task = tasks[_taskId];
+    function createCompletionProposal(uint taskId, string memory details, uint duration) public {
+        Task storage task = tasks[taskId];
         require(task.status == TaskStatus.Started, "invalid task status");
-        require(task.completionVotes[msg.sender] == Vote.Null, "already voted");
-        require(task.taskDeadline < block.timestamp, "task deadline not yet closed");
-        require(IGroups(groupsAddress).isGroupModerator(msg.sender, task.groupId), "not allowed");
-
-        if(_vote) {
-            task.completionVotes[msg.sender] = Vote.Yes;
-            task.yesVotesCompletion = task.yesVotesCompletion + 1;
-        } else {
-            task.completionVotes[msg.sender] = Vote.No;
-            task.noVotesCompletion = task.noVotesCompletion + 1;
-        }
-        emit VotedTaskCompletion(_taskId, msg.sender);
+        require(task.taskDeadline < block.timestamp, "not yet completed");
+        address account = ICoop(task.blockcoop).getAccount(msg.sender);
+        require(task.creator == account, "not allowed");
+        uint proposalId = IVoting(votingAddress).createProposal(msg.sender, task.blockcoop, task.groupId, details, block.timestamp, block.timestamp + duration);
+        task.completionProposal = proposalId;
     }
 
-    function processTaskCompletion(uint _taskId) public {
-        Task storage task = tasks[_taskId];
+    function processTaskCompletion(uint taskId) public {
+        Task storage task = tasks[taskId];
         require(task.status == TaskStatus.Started, "invalid task status");
-        require((task.taskDeadline + 604800) < block.timestamp, "voting not yet closed"); // taskdeadline + 7days
-        require(msg.sender == task.creator, "not allowed");
-
-        if(task.yesVotesCompletion > task.noVotesCompletion) {
+        require(task.taskDeadline < block.timestamp, "not yet completed");
+        require(task.completionProposal > 0, "completion proposal not yet created");
+        address account = ICoop(task.blockcoop).getAccount(msg.sender);
+        require(task.creator == account, "not allowed");
+        uint proposalStatus = IVoting(votingAddress).getProposalStatus(task.completionProposal);
+        if(proposalStatus == 3) {
+            require(IERC20(CURRENCY).transferFrom(msg.sender, address(this), task.reward), "reward amount failed");
             task.status = TaskStatus.Completed;
         } else {
             task.status = TaskStatus.Failed;
         }
-        emit TaskCompletionProcessed(_taskId, msg.sender, task.status);
     }
 
-    function getTask(uint taskId) public view returns (address creator, address blockcoop, uint groupId, string memory details, TaskStatus taskStatus, uint32 votingDeadline, uint32 taskDeadline, address[] memory participants) {
+    function claimReward(uint taskId) public {
         Task storage task = tasks[taskId];
-        creator = task.creator;
-        blockcoop = task.blockcoop;
-        groupId = task.groupId;
-        details = task.details;
-        taskStatus = task.status;
-        votingDeadline = task.votingDeadline;
-        taskDeadline = task.taskDeadline;
-        participants = task.participants;
+        require(task.status == TaskStatus.Completed, "task not completed");
+        address account = ICoop(task.blockcoop).getAccount(msg.sender);
+        require(inArray(task.selectedParticipants, account), "not allowed");
+        require(!task.rewardClaimed[account], "already claimed");
+        uint amount = task.reward / task.selectedParticipants.length;
+        require(IERC20(CURRENCY).transfer(account, amount), "reward transfer failed");
+        task.rewardClaimed[account] = true;
     }
 
-    function getCoopTasks(address _coopAddress) public view returns (uint[] memory) {
-        return coopTasks[_coopAddress];
-    }
-
-    function getCreatedTasks(address _member) public view returns (uint[] memory) {
-        return createdTasks[_member];
-    }
-
-    function getParticipatedTasks(address _member) public view returns (uint[] memory) {
-        return participatedTasks[_member];
-    }
-
-    function isVoted(uint taskId) public view returns (bool) {
-        Task storage task = tasks[taskId];
-        return task.votes[msg.sender] != Vote.Null;
-    }
-
-    function isTaskCompletionVoted(uint taskId) public view returns (bool) {
-        Task storage task = tasks[taskId];
-        return task.completionVotes[msg.sender] != Vote.Null;
+    function inArray(address[] memory heystack, address niddle) private pure returns (bool) {
+        for(uint i = 0; i < heystack.length; i++) {
+            if(heystack[i] == niddle) {
+                return true;
+            }
+        }
+        return false;
     }
 }

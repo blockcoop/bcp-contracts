@@ -6,7 +6,7 @@ const signer = new ethers.Wallet(PRIVATE_KEY, alchemyProvider);
 const factoryContract = new ethers.Contract("0x2ce6Bf32b724482430178286A60120B6a3FdeEc3", contract.abi, signer);
 
 async function main() {
-    const uri = await factoryContract.createCoop("Test Coop", "TCP", 172800, 20, 60, 0, "India");
+    const uri = await factoryContract.coops(0);
     console.log("The URI is: " + uri);
   }
   main();

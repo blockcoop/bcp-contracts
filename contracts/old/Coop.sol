@@ -3,11 +3,13 @@ pragma solidity ^0.8.1;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import { Base64 } from "./libraries/Base64.sol";
+import "../interfaces_old/IFactory.sol";
+import "../interfaces_old/IMultiSigWallet.sol";
 
-contract CoopNFT is ERC721URIStorage {
+contract Coop_Old is ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
+    bool transferLocked = false;
 
     address factoryAddress;
     address public coopInitiator;
@@ -18,9 +20,6 @@ contract CoopNFT is ERC721URIStorage {
     uint32 public created;
     uint public membershipFee;
     string public country;
-
-    string internal constant svgPartOne = "<svg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='xMinYMin meet' viewBox='0 0 350 350'><style>.base {font-family:Sans,Arial; font-weight: bold; }</style><rect x='5' y='5' rx='20' ry='20' width='340' height='340' style='fill:#FFFFFF;stroke:#EB3933;stroke-width:5;stroke-opacity:0.9' /><text x='50%' y='40' class='base' text-anchor='middle' fill='#8F8F8F' style='font-size: 11px;'>COOP NAME</text><text x='50%' y='70' class='base' fill='#000000' text-anchor='middle'>";
-    string internal constant svgPartTwo = "</text><circle cx='50%' cy='190' r='80' stroke='#979797' stroke-width='1' fill='#D8D8D8' /><text x='50%' y='190' class='base' fill='#000000' dominant-baseline='middle' text-anchor='middle'>";
 
     event CoopJoined(address indexed member);
 
@@ -33,45 +32,47 @@ contract CoopNFT is ERC721URIStorage {
         membershipFee = _membershipFee;
         country = _country;
         status = 2;
-
+        
         MintNFT(_coopInitiator, "Creator");
+    }
+
+    function setTransferLocked(bool _locked) private {
+        transferLocked = _locked;
     }
 
     function MintNFT(address member, string memory memberType) private {
         uint256 newItemId = _tokenIds.current();
         string memory _name = name();
-        string memory finalSvg = string(abi.encodePacked(svgPartOne, _name, svgPartTwo, memberType, "</text></svg>"));
-        string memory json = Base64.encode(
-            bytes(
-                string(
-                    abi.encodePacked(
-                        '{"name": "',
-                        _name,
-                        ' membership", "description": "',
-                        memberType,
-                        ' Membership card for ',
-                        _name,
-                        '", "image": "data:image/svg+xml;base64,',
-                        Base64.encode(bytes(finalSvg)),
-                        '"}'
-                    )
-                )
-            )
-        );
+        string memory finalTokenUri = IFactory(factoryAddress).getTokenURI(_name, memberType);
+        // string memory finalTokenUri = "0xa8da7eB9ED0629dE63cA5D7150a74e1AFbEfAac0";
 
-        string memory finalTokenUri = string(
-            abi.encodePacked("data:application/json;base64,", json)
-        );
-
+        setTransferLocked(false);
         _safeMint(member, newItemId);
+        setTransferLocked(true);
         _setTokenURI(newItemId, finalTokenUri);
         _tokenIds.increment();
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal {
+        require(!transferLocked, "not allowed");
     }
 
     function joinCoop() public payable {
         require(balanceOf(msg.sender) == 0, "already a member");
         require(msg.value == membershipFee, "invalid membership fee");
         MintNFT(msg.sender, "Member");
+        IFactory(factoryAddress).addMember(msg.sender);
+        if(msg.value > 0) {
+            IMultiSigWallet(IFactory(factoryAddress).walletAddress()).deposit(msg.value);
+        }
         emit CoopJoined(msg.sender);
+    }
+
+    function getCoopSize() public view returns (uint) {
+        return _tokenIds.current();
     }
 }

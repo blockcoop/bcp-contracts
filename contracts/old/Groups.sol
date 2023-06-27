@@ -2,10 +2,10 @@
 pragma solidity ^0.8.1;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "./interfaces/IFactory.sol";
-import "./interfaces/ICoop.sol";
+import "../interfaces_old/IFactory.sol";
+import "../interfaces_old/ICoop.sol";
 
-contract Groups {
+contract Groups_old {
     using Counters for Counters.Counter;
     Counters.Counter private _groupCount;
 
@@ -19,7 +19,6 @@ contract Groups {
 
     struct Group {
         string name;
-        string description;
         address[] members;
         address[] moderators;
     }
@@ -28,52 +27,47 @@ contract Groups {
         factoryAddress = _factoryAddress;
     }
 
-    function createGroup(address blockcoop, string memory name, string memory description) public {
+    function createGroup(address blockcoop, string memory name) public {
         bool isValidCoop = IFactory(factoryAddress).isValidCoop(blockcoop);
         require(isValidCoop == true, "invalid blockcoop");
         address coopInitiator = ICoop(blockcoop).coopInitiator();
-        address account = ICoop(blockcoop).getAccount(msg.sender);
-        require(coopInitiator == account, "not allowed");
+        require(coopInitiator == msg.sender, "not allowed");
         _groupCount.increment();
-        uint groupId = _groupCount.current();
         address[] memory members;
         address[] memory moderators;
         Group memory group = Group(
             name,
-            description,
             members,
             moderators
         );
 
-        groups[groupId] = group;
-        coopGroups[blockcoop].push(groupId);
+        groups[_groupCount.current()] = group;
+        coopGroups[blockcoop].push(_groupCount.current());
 
-        emit GroupCreated(blockcoop, account, name);
+        emit GroupCreated(blockcoop, msg.sender, name);
     }
 
     function joinGroup(address blockcoop, uint groupId) public {
         require(_groupCount.current() >= groupId, "invalid group");
         require(existsCoopGroup(blockcoop, groupId), "invalid blockcoop group");
         require(ICoop(blockcoop).balanceOf(msg.sender) > 0, "not a coop member");
-        address account = ICoop(blockcoop).getAccount(msg.sender);
-        require(isGroupMember(account, groupId) == false, "already a member");
+        require(isGroupMember(msg.sender, groupId) == false, "already a member");
 
         Group storage group = groups[groupId];
-        group.members.push(account);
+        group.members.push(msg.sender);
 
-        emit GroupJoined(account, groupId);
+        emit GroupJoined(msg.sender, groupId);
     }
 
     function assignModerator(address blockcoop, uint groupId, address moderator) public {
-        address account = ICoop(blockcoop).getAccount(msg.sender);
-        require(ICoop(blockcoop).coopInitiator() == account, "not allowed");
+        require(ICoop(blockcoop).coopInitiator() == msg.sender, "not allowed");
         require(isGroupMember(moderator, groupId), "not a group member");
         require(!isGroupModerator(moderator, groupId), "already a group moderator");
 
         Group storage group = groups[groupId];
         group.moderators.push(moderator);
 
-        emit GroupModeratorAssigned(account, groupId, moderator);
+        emit GroupModeratorAssigned(msg.sender, groupId, moderator);
     }
 
     function existsCoopGroup(address blockcoop, uint groupId) public view returns (bool) {
@@ -109,9 +103,9 @@ contract Groups {
         return coopGroups[blockcoop];
     }
 
-    function getGroupDetails(uint groupId) public view returns (string memory name, string memory description, address[] memory members, address[] memory moderator) {
+    function getGroupDetails(uint groupId) public view returns (string memory name, address[] memory members, address[] memory moderator) {
         Group memory group = groups[groupId];
-        return (group.name, group.description, group.members, group.moderators); 
+        return (group.name, group.members, group.moderators); 
     }
 
     function getGroupMemberCount(uint groupId) public view returns (uint) {

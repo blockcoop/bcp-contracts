@@ -1,6 +1,6 @@
 async function main() {
     const CoopNFT = await ethers.getContractFactory("CoopNFT");
-    const coopNFT = await CoopNFT.deploy();   
+    const coopNFT = await CoopNFT.deploy("Dynamic Coop NFT", "DCN", "0xa8da7eB9ED0629dE63cA5D7150a74e1AFbEfAac0", 36000, 20, 50, 0, "IN");   
     console.log("CoopNFT Contract deployed to address:", coopNFT.address);
  }
  main()
