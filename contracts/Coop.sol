@@ -27,16 +27,17 @@ contract Coop is Initializable, ERC721Upgradeable, ERC721URIStorageUpgradeable, 
 
     event CoopJoined(address indexed member);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(string memory _name, string memory _symbol, address _coopInitiator, bool _isRestricted, uint8 _quorum, address _tokenAddress, string memory _country) initializer public {
+    function initialize(address factory, string memory _name, string memory _symbol, address _coopInitiator, bool _isRestricted, uint8 _quorum, address _tokenAddress, string memory _country) initializer public {
         __ERC721_init(_name, _symbol);
         __ERC721URIStorage_init();
         __Pausable_init();
         __Ownable_init();
-        factoryAddress = msg.sender;
+        factoryAddress = factory;
         isRestricted = _isRestricted;
         quorum = _quorum;
         tokenAddress = _tokenAddress;
@@ -46,6 +47,7 @@ contract Coop is Initializable, ERC721Upgradeable, ERC721URIStorageUpgradeable, 
         
         address account = MintNFT(_coopInitiator, "Creator");
         coopInitiator = account;
+        transferOwnership(coopInitiator);
     }
 
     function pause() public onlyOwner {

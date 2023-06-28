@@ -4,6 +4,7 @@
 
 require("dotenv").config();
 require("@nomiclabs/hardhat-ethers");
+require('@openzeppelin/hardhat-upgrades');
 require('hardhat-contract-sizer');
 
 const { API_URL, PRIVATE_KEY, RINKEBY_API_URL, ARBITRUM_GOERLI_API_URL } = process.env;
