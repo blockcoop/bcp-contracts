@@ -1,6 +1,6 @@
 async function main() {
     const Groups = await ethers.getContractFactory("Groups");
-    const groups = await Groups.deploy("0x3f80F22C01f5923F1047d968f88f10bb5eD88d25");   
+    const groups = await Groups.deploy("0x7D7D2FeAB2F8613bBA6a290D1E4dcE05878bb1FE");   
     console.log("Groups Contract deployed to address:", groups.address);
  }
  main()
@@ -10,4 +10,4 @@ async function main() {
         process.exit(1);
     });
 
-// Groups address : 0x5A8fC85577d4e9A9b5CA51A2f69ECD66A2F80BAb
+// Groups address : 0x4E28F12815477e71Bba92EA263916db17c2c40bb

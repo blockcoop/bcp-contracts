@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.13;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
+import "./ERC721.sol";
 import "./interfaces/IFactory.sol";
 
-contract Coop is Initializable, ERC721Upgradeable, ERC721URIStorageUpgradeable, PausableUpgradeable, OwnableUpgradeable {
+contract Coop is ERC721, Ownable, Pausable {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
+    mapping(uint256 => string) private _tokenURIs;
 
     address factoryAddress;
     address public coopInitiator;
@@ -32,12 +31,9 @@ contract Coop is Initializable, ERC721Upgradeable, ERC721URIStorageUpgradeable, 
         _disableInitializers();
     }
 
-    function initialize(address factory, string memory _name, string memory _symbol, address _coopInitiator, bool _isRestricted, uint8 _quorum, address _tokenAddress, string memory _country) initializer public {
+    function initialize(string memory _name, string memory _symbol, address _coopInitiator, bool _isRestricted, uint8 _quorum, address _tokenAddress, string memory _country) initializer public {
         __ERC721_init(_name, _symbol);
-        __ERC721URIStorage_init();
-        __Pausable_init();
-        __Ownable_init();
-        factoryAddress = factory;
+        factoryAddress = msg.sender;
         isRestricted = _isRestricted;
         quorum = _quorum;
         tokenAddress = _tokenAddress;
@@ -64,7 +60,7 @@ contract Coop is Initializable, ERC721Upgradeable, ERC721URIStorageUpgradeable, 
         string memory _name = name();
         string memory finalTokenUri = IFactory(factoryAddress).getTokenURI(_name, memberType);
         _safeMint(member, newItemId);
-        _setTokenURI(newItemId, finalTokenUri);
+        _tokenURIs[newItemId] = finalTokenUri;
         // create token bound account
         account = IFactory(factoryAddress).createAccount(address(this), newItemId);
     }
@@ -88,20 +84,14 @@ contract Coop is Initializable, ERC721Upgradeable, ERC721URIStorageUpgradeable, 
         ownedToken[to] = tokenId;
     }
 
-    function _burn(uint256 tokenId)
-        internal
-        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
-    {
-        super._burn(tokenId);
-    }
-
     function tokenURI(uint256 tokenId)
         public
         view
-        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
+        override
         returns (string memory)
     {
-        return super.tokenURI(tokenId);
+        _requireMinted(tokenId);
+        return _tokenURIs[tokenId];
     }
 
     function inviteMember(address _member) public onlyOwner {
@@ -133,15 +123,6 @@ contract Coop is Initializable, ERC721Upgradeable, ERC721URIStorageUpgradeable, 
 
     function totalSupply() public view returns (uint) {
         return _tokenIds.current();
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
     }
 
     function getAccount(address member) public view returns (address account) {

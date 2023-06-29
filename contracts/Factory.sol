@@ -37,7 +37,7 @@ contract Factory is ProxyFactory {
     ) public {
         require(existingSymbols[_symbol] == false, "duplicate symbol");
         existingSymbols[_symbol] = true;
-        bytes memory _data = abi.encodeCall(ICoop.initialize, (address(this), _name, _symbol, msg.sender, _isRestricted, _quorum, _tokenAddress, _country)); 
+        bytes memory _data = abi.encodeCall(ICoop.initialize, (_name, _symbol, msg.sender, _isRestricted, _quorum, _tokenAddress, _country)); 
         address coop = deployMinimal(coopTemplate, _data);
         coops.push(address(coop));
         validCoops[address(coop)] = true;
