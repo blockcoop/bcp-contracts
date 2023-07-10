@@ -11,14 +11,14 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+// import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 /**
  * @dev Implementation of https://eips.ethereum.org/EIPS/eip-721[ERC721] Non-Fungible Token Standard, including
  * the Metadata extension, but not including the Enumerable extension, which is available separately as
  * {ERC721Enumerable}.
  */
-contract ERC721 is Context, ERC165, IERC721, IERC721Metadata, Initializable {
+contract ERC721 is Context, ERC165, IERC721, IERC721Metadata {
     using Address for address;
     using Strings for uint256;
 
@@ -40,20 +40,18 @@ contract ERC721 is Context, ERC165, IERC721, IERC721Metadata, Initializable {
     // Mapping from owner to operator approvals
     mapping(address => mapping(address => bool)) private _operatorApprovals;
 
-    /**
-     * @dev Initializes the contract by setting a `name` and a `symbol` to the token collection.
-     */
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
+    // isInitialized
+    bool isInitialized;
+
 
     /**
         @dev New function added to make contract initializable
      */
-    function __ERC721_init(string memory name_, string memory symbol_) initializer internal {
+    function __ERC721_init(string memory name_, string memory symbol_) internal {
+        require(!isInitialized, "already initialized");
         _name = name_;
         _symbol = symbol_;
+        isInitialized = true;
     }
 
     /**

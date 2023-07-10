@@ -36,15 +36,17 @@ contract Tasks {
         address creator;
         address blockcoop;
         uint8 groupId;
+        string title;
         string details;
+        string taskType;
         uint participationDeadline;
         uint taskDuration;
         uint taskDeadline;
         address[] participants;
-        mapping(address => uint) applicationProposal;
+        mapping(address => uint) applicationProposal; // blockcoop address maps to completionProposal
         address[] selectedParticipants;
         uint reward;
-        uint completionProposal;
+        // uint completionProposal;
         mapping(address => bool) rewardClaimed;
         TaskStatus status;
     }
@@ -55,7 +57,7 @@ contract Tasks {
         votingAddress = voting;
     }
 
-    function createTask(address blockcoop, uint8 groupId, string memory details, uint32 participationDeadline, uint32 taskDuration, uint reward) public returns (uint taskId) {
+    function createTask(address blockcoop, uint8 groupId, string memory title, string memory taskType, string memory details, uint32 participationDeadline, uint32 taskDuration, uint reward) public returns (uint taskId) {
         require(IFactory(factoryAddress).isValidCoop(blockcoop), "invalid blockcoop");
         address account = ICoop(blockcoop).getAccount(msg.sender);
         require(IGroups(groupsAddress).existsCoopGroup(blockcoop, groupId), "invalid blockcoop group");
@@ -69,6 +71,8 @@ contract Tasks {
         task.creator = account;
         task.blockcoop = blockcoop;
         task.groupId = groupId;
+        task.title = title;
+        task.taskType = taskType;
         task.details = details;
         task.participationDeadline = participationDeadline;
         task.taskDuration = taskDuration;
@@ -78,6 +82,41 @@ contract Tasks {
         emit TaskCreated(taskId, account, blockcoop, groupId);
     }
 
+    function getTask(uint taskId) public view returns (address creator, address blockcoop, uint8 groupId, string memory title, string memory taskType, string memory details, uint participationDeadline, uint taskDuration, uint taskDeadline, uint reward, TaskStatus status) {
+        Task storage task = tasks[taskId];
+        creator = task.creator;
+        blockcoop = task.blockcoop;
+        groupId = task.groupId;
+        title = task.title;
+        taskType = task.taskType;
+        details = task.details;
+        participationDeadline = task.participationDeadline;
+        taskDuration = task.taskDuration;
+        taskDeadline = task.taskDeadline;
+        reward = task.reward;
+        status = task.status;
+    }
+
+    function getParticipants(uint taskId) public view returns (address[] memory) {
+        Task storage task = tasks[taskId];
+        return task.participants;
+    }
+
+    function getSelectedParticipants(uint taskId) public view returns (address[] memory) {
+        Task storage task = tasks[taskId];
+        return task.selectedParticipants;
+    }
+
+    function getApplicationProposal(uint taskId, address applicant) public view returns (uint) {
+        Task storage task = tasks[taskId];
+        return task.applicationProposal[applicant];
+    }
+
+    function isRewardClaimed(uint taskId, address participant) public view returns (bool) {
+        Task storage task = tasks[taskId];
+        return task.rewardClaimed[participant];
+    }
+
     function participate(uint taskId, string memory application) public {
         Task storage task = tasks[taskId];
         require(task.status == TaskStatus.Proposed, "invalid task status");
@@ -85,8 +124,8 @@ contract Tasks {
         address account = ICoop(task.blockcoop).getAccount(msg.sender);
         require(task.applicationProposal[account] == 0, "already applied");
         require(IGroups(groupsAddress).isGroupMember(account, task.groupId), "not allowed");
-
-        uint proposalId = IVoting(votingAddress).createProposal(msg.sender, task.blockcoop, task.groupId, application, block.timestamp, task.participationDeadline);
+        string memory title = string(abi.encodePacked('Paricipation for ',task.title));
+        uint proposalId = IVoting(votingAddress).createProposal(msg.sender, task.blockcoop, task.groupId, title, application, block.timestamp + 150, task.participationDeadline);
 
         task.participants.push(account);
         task.applicationProposal[account] = proposalId;
@@ -123,20 +162,23 @@ contract Tasks {
         Task storage task = tasks[taskId];
         require(task.status == TaskStatus.Started, "invalid task status");
         require(task.taskDeadline < block.timestamp, "not yet completed");
+        require(task.applicationProposal[task.blockcoop] == 0, "completion proposal already created");
         address account = ICoop(task.blockcoop).getAccount(msg.sender);
         require(task.creator == account, "not allowed");
-        uint proposalId = IVoting(votingAddress).createProposal(msg.sender, task.blockcoop, task.groupId, details, block.timestamp, block.timestamp + duration);
-        task.completionProposal = proposalId;
+        string memory title = string(abi.encodePacked('Completion of ',task.title));
+        uint proposalId = IVoting(votingAddress).createProposal(msg.sender, task.blockcoop, task.groupId, title, details, block.timestamp + 150, block.timestamp + duration);
+        task.applicationProposal[task.blockcoop] = proposalId;
     }
 
     function processTaskCompletion(uint taskId) public {
         Task storage task = tasks[taskId];
         require(task.status == TaskStatus.Started, "invalid task status");
         require(task.taskDeadline < block.timestamp, "not yet completed");
-        require(task.completionProposal > 0, "completion proposal not yet created");
+        require(task.applicationProposal[task.blockcoop] > 0, "completion proposal not yet created");
         address account = ICoop(task.blockcoop).getAccount(msg.sender);
         require(task.creator == account, "not allowed");
-        uint proposalStatus = IVoting(votingAddress).getProposalStatus(task.completionProposal);
+        uint proposalStatus = IVoting(votingAddress).getProposalStatus(task.applicationProposal[task.blockcoop]);
+        require(proposalStatus != 2, "proposal is still active");
         if(proposalStatus == 3) {
             require(IERC20(CURRENCY).transferFrom(msg.sender, address(this), task.reward), "reward amount failed");
             task.status = TaskStatus.Completed;

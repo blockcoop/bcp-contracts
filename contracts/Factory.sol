@@ -1,30 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
-import "./interfaces/ITokenURI.sol";
-import "./libraries/MinimalProxyStore.sol";
 import "./ProxyFactory.sol";
 import "./interfaces/ICoop.sol";
+import "./interfaces/ITokenURI.sol";
+import "./libraries/MinimalProxyStore.sol";
 
 contract Factory is ProxyFactory {
     address coopTemplate;
-    address accountImplementation;
     address tokenURIAddress;
-    mapping(string => bool) existingSymbols;
+    address accountImplementation;
     address[] public coops;
+    mapping(string => bool) existingSymbols;
     mapping(address => bool) validCoops;
 
     event CoopCreated(address indexed initiator, address coopAddress);
     event AccountCreated(address account, address indexed tokenContract, uint256 indexed tokenId);
 
-    constructor(address _coopTemplate, address _accountImplementation, address _tokenURIAddress) {
+    constructor(address _coopTemplate, address _tokenURI, address _accountImplementation) {
         coopTemplate = _coopTemplate;
+        tokenURIAddress = _tokenURI;
         accountImplementation = _accountImplementation;
-        tokenURIAddress = _tokenURIAddress;
-    }
-
-    function getCoopCount() public view returns (uint) {
-        return coops.length;
     }
 
     function createCoop(
@@ -39,9 +35,13 @@ contract Factory is ProxyFactory {
         existingSymbols[_symbol] = true;
         bytes memory _data = abi.encodeCall(ICoop.initialize, (_name, _symbol, msg.sender, _isRestricted, _quorum, _tokenAddress, _country)); 
         address coop = deployMinimal(coopTemplate, _data);
-        coops.push(address(coop));
-        validCoops[address(coop)] = true;
-        emit CoopCreated(msg.sender, address(coop));
+        coops.push(coop);
+        validCoops[coop] = true;
+        emit CoopCreated(msg.sender, coop);
+    }
+
+    function getCoopCount() public view returns (uint) {
+        return coops.length;
     }
 
     function isValidCoop(address coopAddress) public view returns (bool) {

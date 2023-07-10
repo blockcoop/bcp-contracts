@@ -4,6 +4,7 @@ pragma solidity ^0.8.13;
 interface IVoting {
     function createProposal (address creator, address blockcoop,
         uint8 groupId,
+        string memory title,
         string memory details,
         uint startTime,
         uint endTime) external returns (uint proposalId);

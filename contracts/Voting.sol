@@ -43,6 +43,7 @@ contract Voting {
         address creator;
         address blockcoop;
         uint8 groupId;
+        string title;
         string details;
         uint startTime;
         uint endTime;
@@ -60,6 +61,7 @@ contract Voting {
         address creator,
         address blockcoop,
         uint8 groupId,
+        string memory title,
         string memory details,
         uint startTime,
         uint endTime
@@ -83,6 +85,7 @@ contract Voting {
         proposal.creator = account;
         proposal.blockcoop = blockcoop;
         proposal.groupId = groupId;
+        proposal.title = title;
         proposal.details = details;
         proposal.startTime = startTime;
         proposal.endTime = endTime;
@@ -148,11 +151,12 @@ contract Voting {
         emit Voted(proposalId, account);
     }
 
-    function getProposal(uint proposalId) public view returns (address creator, address blockcoop, uint8 groupId, string memory details, uint startTime, uint endTime, uint yesVotes, uint noVotes) {
+    function getProposal(uint proposalId) public view returns (address creator, address blockcoop, uint8 groupId, string memory title, string memory details, uint startTime, uint endTime, uint yesVotes, uint noVotes) {
         Proposal storage proposal = proposals[proposalId];
         creator = proposal.creator;
         blockcoop = proposal.blockcoop;
         groupId = proposal.groupId;
+        title = proposal.title;
         details = proposal.details;
         startTime = proposal.startTime;
         endTime = proposal.endTime;

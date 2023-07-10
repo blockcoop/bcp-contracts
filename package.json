@@ -15,9 +15,12 @@
     "hardhat": "^2.14.0"
   },
   "dependencies": {
+    "@nomiclabs/hardhat-waffle": "^2.0.3",
     "@openzeppelin/contracts": "^4.8.3",
     "@openzeppelin/contracts-upgradeable": "^4.9.2",
+    "chai": "^4.3.7",
     "dotenv": "^16.0.3",
+    "ethereum-waffle": "^3.4.0",
     "hardhat-contract-sizer": "^2.8.0"
   }
 }

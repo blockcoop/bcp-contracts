@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.1;
+pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./interfaces/IFactory.sol";
@@ -52,7 +52,6 @@ contract Groups {
     }
 
     function joinGroup(address blockcoop, uint groupId) public {
-        require(_groupCount.current() >= groupId, "invalid group");
         require(existsCoopGroup(blockcoop, groupId), "invalid blockcoop group");
         require(ICoop(blockcoop).balanceOf(msg.sender) > 0, "not a coop member");
         address account = ICoop(blockcoop).getAccount(msg.sender);
