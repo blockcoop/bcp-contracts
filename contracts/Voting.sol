@@ -24,6 +24,7 @@ contract Voting {
     );
 
     event Voted(uint proposalId, address indexed account);
+    event ProposalProcessed(uint indexed proposalId, ProposalStatus status);
 
     enum Vote {
         Null,
@@ -36,7 +37,8 @@ contract Voting {
         Proposed,
         Active,
         Passed,
-        Failed
+        Failed,
+        Pending
     }
 
     struct Proposal {
@@ -49,6 +51,7 @@ contract Voting {
         uint endTime;
         uint yesVotes;
         uint noVotes;
+        ProposalStatus status;
         mapping(address => Vote) votes;
     }
 
@@ -89,6 +92,7 @@ contract Voting {
         proposal.details = details;
         proposal.startTime = startTime;
         proposal.endTime = endTime;
+        proposal.status = ProposalStatus.Pending;
 
         coopProposals[blockcoop].push(proposalId);
 
@@ -108,6 +112,17 @@ contract Voting {
         if (proposal.endTime > block.timestamp) {
             return ProposalStatus.Active;
         }
+        
+        return proposal.status;
+    }
+
+    function processProposal(uint proposalId) public returns(ProposalStatus) {
+        Proposal storage proposal = proposals[proposalId];
+        address account = ICoop(proposal.blockcoop).getAccount(msg.sender);
+        require(account == proposal.creator, "not allowed");
+        ProposalStatus status = getProposalStatus(proposalId);
+        require(status == ProposalStatus.Pending, "invalid status");
+
         uint8 quorum = ICoop(proposal.blockcoop).quorum();
         uint memberCount = IGroups(groupsAddress).getGroupMemberCount(
             proposal.groupId
@@ -116,13 +131,16 @@ contract Voting {
             (proposal.yesVotes + proposal.noVotes) <
             ((quorum * memberCount) / 100)
         ) {
-            return ProposalStatus.Failed;
+            proposal.status = ProposalStatus.Failed;
         }
         if (proposal.yesVotes > proposal.noVotes) {
-            return ProposalStatus.Passed;
+            proposal.status = ProposalStatus.Passed;
         } else {
-            return ProposalStatus.Failed;
+            proposal.status = ProposalStatus.Failed;
         }
+        
+        emit ProposalProcessed(proposalId, proposal.status);
+        return proposal.status;
     }
 
     function vote(uint proposalId, bool _vote) public {

@@ -10,4 +10,4 @@ async function main() {
         process.exit(1);
     });
 
-// Voting Address: 0x53906C1DebD46428E45Dab339B5e638c18da205c
+// Voting Address: 0xa8B8fc4d181E5eE87c1C7075ba08b0c6B9464598
