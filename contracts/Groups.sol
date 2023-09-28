@@ -14,7 +14,7 @@ contract Groups {
     mapping(uint => Group) groups;
 
     event GroupCreated(address indexed coopAddress, address indexed creator, string groupName);
-    event GroupJoined(address indexed creator, uint indexed groupId);
+    event GroupJoined(address indexed coopAddress, uint indexed groupId, address indexed creator);
     event GroupModeratorAssigned(address indexed coopAddress, uint indexed groupId, address moderator);
 
     struct Group {
@@ -60,7 +60,7 @@ contract Groups {
         Group storage group = groups[groupId];
         group.members.push(account);
 
-        emit GroupJoined(account, groupId);
+        emit GroupJoined(blockcoop, groupId, account);
     }
 
     function assignModerator(address blockcoop, uint groupId, address moderator) public {

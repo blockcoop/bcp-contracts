@@ -15,6 +15,7 @@ contract Factory is ProxyFactory {
     mapping(address => bool) validCoops;
 
     event CoopCreated(address indexed initiator, address coopAddress);
+    event RestrictedCoopCreated(address indexed initiator, address coopAddress);
     event AccountCreated(address account, address indexed tokenContract, uint256 indexed tokenId);
 
     constructor(address _coopTemplate, address _tokenURI, address _accountImplementation) {
@@ -37,7 +38,11 @@ contract Factory is ProxyFactory {
         address coop = deployMinimal(coopTemplate, _data);
         coops.push(coop);
         validCoops[coop] = true;
-        emit CoopCreated(msg.sender, coop);
+        if(_isRestricted) {
+            emit RestrictedCoopCreated(msg.sender, coop);
+        } else {
+            emit CoopCreated(msg.sender, coop);
+        }
     }
 
     function getCoopCount() public view returns (uint) {

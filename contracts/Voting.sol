@@ -123,13 +123,13 @@ contract Voting {
         ProposalStatus status = getProposalStatus(proposalId);
         require(status == ProposalStatus.Pending, "invalid status");
 
-        uint8 quorum = ICoop(proposal.blockcoop).quorum();
+        uint8 quorum = ICoop(proposal.blockcoop).quorum(); //40
         uint memberCount = IGroups(groupsAddress).getGroupMemberCount(
             proposal.groupId
-        );
+        ); // 3
         if (
-            (proposal.yesVotes + proposal.noVotes) <
-            ((quorum * memberCount) / 100)
+            ((proposal.yesVotes + proposal.noVotes) * 100 ) >
+            (quorum * memberCount)
         ) {
             proposal.status = ProposalStatus.Failed;
         }
@@ -190,5 +190,11 @@ contract Voting {
         Proposal storage proposal = proposals[proposalId];
         address account = ICoop(proposal.blockcoop).getAccount(msg.sender);
         return proposal.votes[account] != Vote.Null;
+    }
+
+    function getVote(uint proposalId) public view returns (Vote) {
+        Proposal storage proposal = proposals[proposalId];
+        address account = ICoop(proposal.blockcoop).getAccount(msg.sender);
+        return proposal.votes[account];
     }
 }

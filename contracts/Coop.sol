@@ -77,6 +77,17 @@ contract Coop is ERC721, Initializable {
         return _tokenURIs[tokenId];
     }
 
+    function inviteMembers(address[] memory members) public {
+        require(members.length > 0, "zero members");
+        address account = getAccount(msg.sender);
+        require(account == coopInitiator, "not allowed");
+        for (uint256 index = 0; index < members.length; index++) {
+            if(isMemberInvited(members[index]) == false) {
+                invitedMembers.push(members[index]);
+            }
+        }
+    }
+
     function inviteMember(address _member) public {
         require(isRestricted, "invite is not needed");
         require(isMemberInvited(_member) == false, "already invited");

@@ -1,6 +1,6 @@
 async function main() {
     const Tasks = await ethers.getContractFactory("Tasks");
-    const tasks = await Tasks.deploy("0xDeA07B136308caaB8Ae43b6AfC942c7fdE1b827b", "0x9074DFFdA5f957AFaB8b4198Fc22e799B6bC6eA6", "0xa8B8fc4d181E5eE87c1C7075ba08b0c6B9464598");   
+    const tasks = await Tasks.deploy("0xCe9B9A9df64458622b149F39f61f5a60391638a0", "0x44bdc26f86FD65Ce6Da276C0AbB0EFd31E3Caa51", "0xD8B9451095DC4fa7B1f533300A37f9eFa1d67f04");   
     console.log("Tasks Contract deployed to address:", tasks.address);
  }
  main()
@@ -10,4 +10,4 @@ async function main() {
         process.exit(1);
     });
 
-// Tasks Address: 0x63Be59053324De6d48f532520BcAAAD5574C7ca1
+// Tasks Address: 0xa1086Ff332960C80A2A72F7296437b114D096BEe

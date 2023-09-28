@@ -1,6 +1,6 @@
 async function main() {
     const Voting = await ethers.getContractFactory("Voting");
-    const voting = await Voting.deploy("0xDeA07B136308caaB8Ae43b6AfC942c7fdE1b827b", "0x9074DFFdA5f957AFaB8b4198Fc22e799B6bC6eA6");   
+    const voting = await Voting.deploy("0xCe9B9A9df64458622b149F39f61f5a60391638a0", "0x44bdc26f86FD65Ce6Da276C0AbB0EFd31E3Caa51");   
     console.log("Voting Contract deployed to address:", voting.address);
  }
  main()
@@ -10,4 +10,4 @@ async function main() {
         process.exit(1);
     });
 
-// Voting Address: 0xa8B8fc4d181E5eE87c1C7075ba08b0c6B9464598
+// Voting Address: 0xD8B9451095DC4fa7B1f533300A37f9eFa1d67f04
